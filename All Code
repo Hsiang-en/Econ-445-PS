@@ -1,0 +1,464 @@
+from statsmodels.tsa.seasonal import seasonal_decompose
+#Plotting libraries
+import numpy as np
+import statsmodels.api as sm
+import warnings
+import pandas as pd
+#from sklearn.linear_model import LinearRegression
+from IPython.display import Image
+import matplotlib.pyplot as plt
+from datetime import datetime
+from scipy import stats
+from matplotlib.lines import Line2D
+import statsmodels.stats.api as sms
+import warnings
+warnings.filterwarnings('ignore')
+import matplotlib.pyplot as plt
+import seaborn as sns
+#import altair as alt
+plt.style.use('seaborn-white')
+%matplotlib inline
+#import pmdarima as pm
+
+
+# 1 Import data
+
+df = pd.read_csv('/Users/shawnho/Documents/445/ID/Google-Playstore.csv',parse_dates=True)
+df.head(10)
+
+# 2 
+
+# 3 Data Cleansing
+
+df1 = df.copy()
+df1 = df1.drop(["App Id", "Minimum Installs", "Maximum Installs", "Minimum Android", \
+               "Developer Id", "Developer Website", "Developer Email", \
+               "Privacy Policy", "Scraped Time"], axis=1)
+df1.head(10)
+
+dataTypeSeries = df1.dtypes
+print('Data type of each column of Dataframe :')
+print(dataTypeSeries)
+
+df1.Category.unique()
+
+df1.loc[(df1['Category'] == "Adventure") | (df1['Category'] == "Racing") | \
+       (df1['Category'] == "Puzzle") | (df1['Category'] == "Arcade") | \
+       (df1['Category'] == "Board") | (df1['Category'] == "Card") | \
+        (df1['Category'] == "Trivia") | (df1['Category'] == "Strategy") | \
+        (df1['Category'] == "Word") | (df1['Category'] == "Action") | \
+        (df1['Category'] == "Simulation") | (df1['Category'] == "Role Playing") | \
+        (df1['Category'] == "Casino") | (df1['Category'] == "Role Playing") \
+        , 'Game'] = 1
+df1.loc[df1['Game'].isnull(), 'Game'] = 0
+
+df1.loc[(df1['Category'] == "Tools") | (df1['Category'] == "Productivity") | \
+       (df1['Category'] == "Maps & Navigation") | (df1['Category'] == "Auto & Vehicles") | \
+       (df1['Category'] == "News & Magazines")| (df1['Category'] == "Weather") | \
+        (df1['Category'] == "Video Players & Editors")| (df1['Category'] == "Parenting") \
+        , 'Productivity_And_Tools'] = 1
+df1.loc[df1['Productivity_And_Tools'].isnull(), 'Productivity_And_Tools'] = 0
+
+df1.loc[(df1['Category'] == "Communication") | (df1['Category'] == "Social") | \
+       (df1['Category'] == "Events") | (df1['Category'] == "Dating") \
+       , 'Communication_And_Social'] = 1
+df1.loc[df1['Communication_And_Social'].isnull(), 'Communication_And_Social'] = 0
+
+df1.loc[(df1['Category'] == "Libraries & Demo") | (df1['Category'] == "Books & Reference") | \
+       (df1['Category'] == "Education") | (df1['Category'] == "Educational") \
+       , 'Education'] = 1
+df1.loc[df1['Education'].isnull(), 'Education'] = 0
+
+df1.loc[(df1['Category'] == "Lifestyle") | (df1['Category'] == "Personalization") | \
+       (df1['Category'] == "Travel & Local") | (df1['Category'] == "Food & Drink") | \
+       (df1['Category'] == "Entertainment") | (df1['Category'] == "Photography") | \
+       (df1['Category'] == "Shopping") | (df1['Category'] == "Sports") | \
+       (df1['Category'] == "Beauty") | \
+       (df1['Category'] == "Casual") | (df1['Category'] == "Art & Design") | \
+      (df1['Category'] == "House & Home") | (df1['Category'] == "Comics") \
+        , 'Style_And_Entertainment'] = 1
+df1.loc[df1['Style_And_Entertainment'].isnull(), 'Style_And_Entertainment'] = 0
+
+df1.loc[(df1['Category'] == "Medical") | (df1['Category'] == "Health & Fitness") \
+       , 'Health'] = 1
+df1.loc[df1['Health'].isnull(), 'Health'] = 0
+
+df1.loc[(df1['Category'] == "Music & Audio") | (df1['Category'] == "Music") \
+       , 'Music'] = 1
+df1.loc[df1['Music'].isnull(), 'Music'] = 0
+
+df1.loc[(df1['Category'] == "Business") | (df1['Category'] == "Finance") \
+       , 'Business_And_Finance'] = 1
+df1.loc[df1['Business_And_Finance'].isnull(), 'Business_And_Finance'] = 0
+
+df1['Installs'] = df1['Installs'].str.replace(",", "")
+df1['Installs'] = df1['Installs'].str.replace("+", "")
+
+df1["Free"] = pd.get_dummies(df1['Free'], drop_first=True)
+
+df1.loc[(df1['Currency'] == "USD"), 'USD'] = 1
+df1.loc[df1['USD'].isnull(), 'USD'] = 0
+
+df1.loc[(df1['Size'].str[-1] == "M"), 'Mb'] = 1
+df1.loc[df1['Mb'].isnull(), 'Mb'] = 0
+
+df1.loc[(df1['Size'].str[-1] == "G"), 'Gb'] = 1
+df1.loc[df1['Gb'].isnull(), 'Gb'] = 0
+
+df1.Installs = pd.to_numeric(df1.loc[:, "Installs"])
+
+df1.Released = pd.to_datetime(df1.loc[:, "Released"])
+
+df1.Last_Updated = pd.to_datetime(df1.loc[:, "Last Updated"])
+
+df1["Released_Date"] = pd.to_datetime("today") - df1["Released"]
+
+df1.loc[(df1.Last_Updated == df1.Released ), 'Update'] = 1
+df1.loc[df1['Update'].isnull(), 'Update'] = 0
+
+df1.loc[(df1['Content Rating'] == "Adults only 18+"), 'Adult'] = 1
+df1.loc[df1['Adult'].isnull(), 'Adult'] = 0
+
+df1.loc[(df1['Content Rating'] == "Everyone"), 'Everyone'] = 1
+df1.loc[df1['Everyone'].isnull(), 'Everyone'] = 0
+
+df1.loc[(df1['Content Rating'] == "Teen") | (df1['Content Rating'] == "Mature 17+") \
+       | (df1['Content Rating'] == "Everyone 10+"), 'Between_Everyone_Adult'] = 1
+df1.loc[df1['Between_Everyone_Adult'].isnull(), 'Between_Everyone_Adult'] = 0
+
+df1["Have_Ad_Supported"] = pd.get_dummies(df1['Ad Supported'], drop_first=True)
+df1["Have_In_App_Purchases"] = pd.get_dummies(df1['In App Purchases'], drop_first=True)
+df1["Have_Editors_Choice"] = pd.get_dummies(df1['Editors Choice'], drop_first=True)
+
+df2 = df1.copy()
+#df2.rename(columns={"Free": "Paid"}, inplace=True)
+df2.Released_Date = df2.Released_Date.dt.days
+
+df2.loc[(df2['Rating Count'] > 0), 'Have_Rating'] = 1
+df2.loc[df2['Have_Rating'].isnull(), 'Have_Rating'] = 0
+
+df3 = df2.dropna()    
+
+df3.isnull().values.any()
+
+df3 = df3.drop(["Category", "Rating Count", "Currency", \
+               "Size", "Released", "Last Updated", \
+               "Content Rating", "Ad Supported", \
+               "In App Purchases", "Editors Choice", "Business_And_Finance"], axis=1)
+               
+df3[df3['Free'] == 1].Free.count()
+df3[df3['Free'] == 0].Free.count()
+
+Paid = df3[df3['Free'] == 0]
+Paid.to_csv('/Users/shawnho/Documents/445/ID/Paid.csv', encoding='utf-8')
+
+data33 = pd.read_csv('/Users/shawnho/Documents/445/ID/Paid.csv',parse_dates=True)
+data33.index = data33.iloc[:,0]
+data33 = data33.iloc[:,1:]
+data33.head(10)
+
+# 4
+# k-means method
+
+from sklearn.cluster import KMeans
+data3 = Paid.drop(columns=['App Name'])
+
+km = KMeans(
+    n_clusters=4, init='random',
+    n_init=10, max_iter=300, 
+    tol=1e-04, random_state=0
+)
+
+y3 = data3[['Installs']]
+
+data3['Installs'] = y3['Installs']
+y_km = km.fit_predict(data3)
+
+data3.Price
+
+distortions = []
+k_range = range(1, 6)
+
+for i in k_range:
+    kmeans = KMeans(n_clusters=i).fit(data3)
+    distortions.append(kmeans.inertia_) 
+    
+plt.figure(figsize=(10,5))   
+plt.plot(k_range, distortions)
+plt.xticks(k_range) 
+plt.grid(linestyle='--')
+plt.xlabel("Number of Clusters Initialized")
+plt.ylabel('SSE')
+plt.title("SSE")
+sns.despine()
+
+col1='Installs'
+col1ind = 10
+#col1='size_sf'
+#col1ind = 0
+#col1='no_stories'
+#col1='lot_size_ac'
+
+col2='Price'
+col2ind = 0
+
+#col2='no_stories'
+#col2ind = 1
+
+#col2='year_built'
+#col2ind = 3
+
+#col2='building_class'
+#col2='parking_ratio'
+#col2='opportunity_zone'
+#col2='cap_rate'
+
+plt.figure(figsize=(15,10))
+
+plt.scatter(
+    data3[y_km == 0][col1], data3[y_km == 0][col2],
+    s=50, c='lightgreen',
+    marker='s', edgecolor='black',
+    label='cluster 1'
+)
+
+plt.scatter(
+    data3[y_km == 1][col1], data3[y_km == 1][col2],
+    s=50, c='orange',
+    marker='o', edgecolor='black',
+    label='cluster 2'
+)
+
+plt.scatter(
+    data3[y_km == 2][col1], data3[y_km == 2][col2],
+    s=50, c='lightblue',
+    marker='v', edgecolor='black',
+    label='cluster 3'
+)
+
+plt.scatter(
+    data3[y_km == 3][col1], data3[y_km == 3][col2],
+    s=50, c='navy',
+    marker='p', edgecolor='black',
+    label='cluster 3'
+)
+
+plt.scatter(
+    data3[y_km == 4][col1], data3[y_km == 4][col2],
+    s=50, c='pink',
+    marker='x', edgecolor='black',
+    label='cluster 4'
+)
+
+
+# plot the centroids
+plt.scatter(
+    km.cluster_centers_[:, col1ind], km.cluster_centers_[:, col2ind],
+    s=250, marker='*',
+    c='red', edgecolor='black',
+    label='centroids'
+)
+
+plt.ticklabel_format(style='plain', axis='x')
+plt.legend(scatterpoints=1)
+plt.grid()
+plt.xlabel(col1)
+plt.ylabel(col2)
+
+plt.show()
+
+
+# Hierarchical clustering
+
+df_h = data33.copy()
+df_h = df_h.drop(["Installs", "Free"], axis=1)
+Yh = df_h.iloc[0:1200,0:2]
+Yh
+
+import scipy.cluster.hierarchy as sch
+
+#Yh = [[i] for i in y_train]
+dendrogram = sch.dendrogram(sch.linkage(Yh, method = 'ward'))
+plt.title('Dendrogram')
+plt.xlabel('Users')
+plt.ylabel('Euclidean distances')
+plt.show()
+
+from sklearn.cluster import AgglomerativeClustering
+#data33 = data33.drop(columns=['App Name'])
+
+ml=AgglomerativeClustering(n_clusters=5)
+#ml.fit_predict(x_train)
+
+#x_train_h = data33.iloc[0:1200,]
+y_train_h = ml.fit_predict(Yh)
+
+print(ml.labels_)
+
+plt.scatter(Yh.Price, Yh.Rating, c=ml.labels_, cmap='rainbow')
+
+# 5
+data5 = data33.copy()
+
+#data5 = data5.drop(columns=['App Name'])
+column_to_reorder = data5.pop('Installs')
+data5.insert(0, 'Installs', column_to_reorder)
+
+data5
+
+# K-fold cross-validation
+
+#Importing required libraries
+from sklearn.datasets import load_breast_cancer 
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LinearRegression 
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score 
+from sklearn import utils
+
+#Loading the dataset
+X = data5.iloc[:,1:-1] 
+Y = data5.iloc[:, 0]
+
+X = df_kfold.iloc[:,1:-1] 
+Y = df_kfold.iloc[:, 0]
+
+k=2
+model = LinearRegression()
+while k < 10:
+    kf = KFold(n_splits=k, random_state=None)  
+    result = cross_val_score(model , X, Y, cv = kf)
+
+    print("k=", k)
+    print("Avg accuracy: {}".format(result.mean()))
+    k = k+1
+    
+#Implementing cross validation
+kf = KFold(n_splits=3, random_state=None) 
+model = LinearRegression()
+result = cross_val_score(model , X, Y, cv = kf)
+
+print(result)
+print("Avg accuracy: {}".format(result.mean()))
+
+# DecisionTrees
+
+from sklearn.model_selection import train_test_split
+xtrain, xtest, ytrain, ytest = train_test_split(data5.iloc[:,1:-1], data5.iloc[:, 0], test_size=0.3, random_state=0)
+
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = \
+train_test_split(data5[["Price", "Rating"]], data5.iloc[:, 0], test_size=0.3, random_state=0)
+
+from sklearn.tree import DecisionTreeClassifier
+model = DecisionTreeClassifier(max_depth=3)
+
+#tree.fit(x_train, y_train)
+
+clf = model.fit(x_train, y_train)
+clf.predict(x_test)
+
+clf.score(x_test, y_test)
+clf.score(x_train, y_train)
+
+import graphviz
+from sklearn.tree import export_graphviz
+from sklearn import tree
+
+export_graphviz(clf, out_file='Tree.dot')
+
+import pydot
+pdot = pydot.graph_from_dot_data(dot_data)
+
+from matplotlib.pylab import rcParams
+
+rcParams['figure.figsize'] = 80,80
+tree.plot_tree(clf, fontsize=40)
+
+# Random Forest
+
+from sklearn.ensemble import RandomForestClassifier
+forest = RandomForestClassifier(n_estimators = 5, max_depth=3)
+
+forest.fit(x_train, y_train)
+
+forest.score(x_train, y_train)
+forest.score(x_test, y_test)
+
+from mlxtend.plotting import plot_decision_regions
+
+X4 = np.array(x_train)
+Y4 = np.array(y_train)
+Y4 = Y4.astype(np.int_)
+
+plot_decision_regions(X4, Y4, clf=forest, legend=0)
+
+# 6
+# SVM regression
+
+data6 = data5.copy()
+data6.drop(["Free", "Business_And_Finance"], axis=1)
+
+X6 = data6.iloc[:,1:-1]
+Y6 = data6.iloc[:,0]
+
+from sklearn import svm
+model = svm.SVC()
+model.fit(x_train,y_train)
+
+predictions = model.predict(x_test)
+predictions
+
+from sklearn.metrics import classification_report, confusion_matrix
+print(confusion_matrix(y_test,predictions))
+print('\n')
+print(classification_report(y_test,predictions))
+
+# Xgboost regression
+
+from xgboost import XGBClassifier
+xgboostModel = XGBClassifier(max_depth = 3, learning_rate= 0.3)
+
+xgboostModel.fit(x_train, y_train)
+predicted = xgboostModel.predict(x_train)
+
+print('Train: ',xgboostModel.score(x_train,y_train))
+print('Test: ',xgboostModel.score(x_test,y_test))
+
+plt.scatter(x_train.Price , y_train, s=10, label='True')
+plt.scatter(x_train.Price, predicted, color="r",s=10, label='Predicted')
+plt.xlabel('Price')
+plt.ylabel('Installs')
+plt.legend()
+plt.show()
+
+plt.scatter(x_train.Rating , y_train, s=10, label='True')
+plt.scatter(x_train.Rating, predicted, color="r",s=10, label='Predicted')
+plt.xlabel('Rating')
+plt.ylabel('Installs')
+plt.legend()
+plt.show()
+
+# 7 Other Visualization 
+df7_a = data33.copy()
+df7_a = df7_a.drop(["Free", "USD", "Adult", "Game", "Productivity_And_Tools", "Communication_And_Social" \
+               , "Education", "Style_And_Entertainment", "Health" \
+                , "Music", "Business_And_Finance"], axis=1)
+
+df7 = data33.drop(["Free","Business_And_Finance"], axis=1)
+
+df7_a.corr()
+df7_ac = df7_a.corr()
+ax = sns.heatmap(df7_ac, vmin=-1, vmax=1)
+
+from pandas.plotting import scatter_matrix
+scatter_matrix(df7_a, figsize = (13, 9), diagonal = 'kde')
+plt.grid()
+
+df7_c = data33[["Installs", "Rating", "Price", "Released_Date"]]
+df7_cc = df7_c.corr()
+ax = sns.heatmap(df7_cc, vmin=-1, vmax=1)
+
+from pandas.plotting import scatter_matrix
+scatter_matrix(df7_c, figsize = (13, 9), diagonal = 'kde')
+plt.grid()
